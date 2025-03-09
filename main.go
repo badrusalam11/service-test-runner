@@ -8,9 +8,10 @@ import (
 	"service-test-runner/internal/config"
 	"service-test-runner/internal/db"
 	httpDelivery "service-test-runner/internal/delivery/http"
+	handler "service-test-runner/internal/delivery/http/handler"
+	"service-test-runner/internal/repository/project"
 	"service-test-runner/internal/repository/selenium"
-	"service-test-runner/internal/usecase/automation"
-	"service-test-runner/internal/usecase/testsuite"
+	"service-test-runner/internal/usecase"
 
 	"github.com/gorilla/mux"
 )
@@ -35,14 +36,19 @@ func main() {
 
 	// Initialize repository with the project mappings.
 	seleniumRepo := selenium.NewSeleniumRepository(projects)
+	projectRepo := project.NewProjectRepository(projects)
 
 	// Initialize use cases.
-	automationUsecase := automation.NewAutomationUsecase(seleniumRepo)
-	testsuiteUsecase := testsuite.NewTestSuiteUsecase(seleniumRepo)
+	automationUsecase := usecase.NewAutomationUsecase(seleniumRepo)
+	testsuiteUsecase := usecase.NewTestSuiteUsecase(seleniumRepo)
+	projectUsecase := usecase.NewProjectUsecase(projectRepo)
 
 	// Setup HTTP router.
 	router := mux.NewRouter()
-	handler := httpDelivery.NewHandler(automationUsecase, testsuiteUsecase)
+	handler := handler.NewHandler(
+		automationUsecase,
+		testsuiteUsecase,
+		projectUsecase)
 	httpDelivery.RegisterRoutes(router, handler)
 
 	// Start the server.

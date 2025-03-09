@@ -1,4 +1,4 @@
-package testsuite
+package usecase
 
 import (
 	"service-test-runner/internal/domain"

@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"service-test-runner/internal/domain"
+	repository "service-test-runner/internal/repository"
 )
 
 type SeleniumRepository struct {
@@ -59,7 +60,7 @@ func (s *SeleniumRepository) RunAutomation(project, testsuiteID, email string) (
 	}
 
 	var runResp domain.RunResponse
-	_, err = ParseGeneralResponse(data, &runResp)
+	_, err = repository.ParseGeneralResponse(data, &runResp)
 	if err != nil {
 		return domain.RunResponse{}, err
 	}
@@ -91,7 +92,7 @@ func (s *SeleniumRepository) GetTestSuites(project string) ([]string, error) {
 	var tsData struct {
 		Testsuites []string `json:"testsuites"`
 	}
-	_, err = ParseGeneralResponse(data, &tsData)
+	_, err = repository.ParseGeneralResponse(data, &tsData)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func (s *SeleniumRepository) GetTestSuiteDetail(project, testsuiteName string) (
 	}
 
 	var detail domain.TestSuiteDetail
-	_, err = ParseGeneralResponse(data, &detail)
+	_, err = repository.ParseGeneralResponse(data, &detail)
 	if err != nil {
 		return domain.TestSuiteDetail{}, err
 	}

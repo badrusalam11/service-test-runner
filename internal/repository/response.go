@@ -1,4 +1,4 @@
-package selenium
+package repository
 
 import "encoding/json"
 
