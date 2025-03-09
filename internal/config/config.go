@@ -1,57 +1,62 @@
 package config
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-type Config struct {
-	Projects map[string]string `json:"projects"`
+type DatabaseConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	DBName   string `mapstructure:"dbname"`
 }
 
-func LoadConfig() Config {
-	var cfg Config
+type Config struct {
+	Database DatabaseConfig `mapstructure:"database"`
+}
 
-	// Check if .env exists
+func LoadConfig() (*Config, error) {
+	// Check if the .env file exists.
 	if _, err := os.Stat(".env"); err == nil {
+		// .env exists; load it.
 		if err := godotenv.Load(); err != nil {
 			log.Printf("Error loading .env file: %v", err)
-		} else {
-			projects := make(map[string]string)
-			if web1 := os.Getenv("WEB1_URL"); web1 != "" {
-				projects["web1"] = web1
+		}
+		// Bind environment variables to our config keys.
+		viper.AutomaticEnv()
+		viper.BindEnv("database.host", "DATABASE_HOST")
+		viper.BindEnv("database.port", "DATABASE_PORT")
+		viper.BindEnv("database.username", "DATABASE_USERNAME")
+		viper.BindEnv("database.password", "DATABASE_PASSWORD")
+		viper.BindEnv("database.dbname", "DATABASE_DBNAME")
+
+		// Since environment variables are strings, we might need to convert port.
+		if portStr := os.Getenv("DATABASE_PORT"); portStr != "" {
+			if port, err := strconv.Atoi(portStr); err == nil {
+				viper.Set("database.port", port)
 			}
-			if mobile := os.Getenv("MOBILE_URL"); mobile != "" {
-				projects["mobile1"] = mobile
-			}
-			if len(projects) > 0 {
-				cfg.Projects = projects
-				return cfg
-			}
+		}
+	} else {
+		// If no .env file exists, load configuration from config.json.
+		viper.SetConfigName("config")
+		viper.SetConfigType("json")
+		viper.AddConfigPath(".")
+		if err := viper.ReadInConfig(); err != nil {
+			log.Printf("Error reading config.json: %v", err)
+			return nil, err
 		}
 	}
 
-	// Fallback to config.json
-	data, err := ioutil.ReadFile("config.json")
-	if err != nil {
-		log.Printf("Error reading config.json: %v", err)
-		// Provide defaults
-		cfg.Projects = map[string]string{
-			"web1":    "http://localhost:5000",
-			"mobile1": "http://localhost:5001",
-		}
-		return cfg
+	var cfg Config
+	if err := viper.Unmarshal(&cfg); err != nil {
+		log.Printf("Error unmarshaling config: %v", err)
+		return nil, err
 	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		log.Printf("Error parsing config.json: %v", err)
-		cfg.Projects = map[string]string{
-			"web1":    "http://localhost:5000",
-			"mobile1": "http://localhost:5001",
-		}
-	}
-	return cfg
+	return &cfg, nil
 }
