@@ -1,0 +1,7 @@
+{
+    "projects": {
+      "web1": "http://localhost:5000",
+      "mobile1": "http://localhost:5001"
+    }
+  }
+  
