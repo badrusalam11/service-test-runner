@@ -50,6 +50,10 @@ func (s *SeleniumRepository) RunAutomation(project, testsuiteID, email string) (
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return domain.RunResponse{}, errors.New("your request is queued")
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return domain.RunResponse{}, errors.New("failed to run automation")
 	}
