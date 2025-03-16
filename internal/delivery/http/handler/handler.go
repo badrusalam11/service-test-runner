@@ -14,16 +14,23 @@ type StandardResponse struct {
 }
 
 type Handler struct {
-	automationUsecase *usecase.AutomationUsecase
-	testsuiteUsecase  *usecase.TestSuiteUsecase
-	projectUsecase    *usecase.ProjectUsecase
+	automationUsecase      *usecase.AutomationUsecase
+	queueAutomationUsecase *usecase.QueueAutomationUseCase
+	testsuiteUsecase       *usecase.TestSuiteUsecase
+	projectUsecase         *usecase.ProjectUsecase
 }
 
-func NewHandler(automationUsecase *usecase.AutomationUsecase, testsuiteUsecase *usecase.TestSuiteUsecase, projectUsecase *usecase.ProjectUsecase) *Handler {
+func NewHandler(
+	automationUsecase *usecase.AutomationUsecase,
+	queueAutomationUsecase *usecase.QueueAutomationUseCase,
+	testsuiteUsecase *usecase.TestSuiteUsecase,
+	projectUsecase *usecase.ProjectUsecase,
+) *Handler {
 	return &Handler{
-		automationUsecase: automationUsecase,
-		testsuiteUsecase:  testsuiteUsecase,
-		projectUsecase:    projectUsecase,
+		automationUsecase:      automationUsecase,
+		queueAutomationUsecase: queueAutomationUsecase,
+		testsuiteUsecase:       testsuiteUsecase,
+		projectUsecase:         projectUsecase,
 	}
 }
 

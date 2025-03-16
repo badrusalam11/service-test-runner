@@ -52,7 +52,7 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "your request is queued" {
 			qa := &db.TblQueueAutomation{
 				Testsuite:  req.TestSuiteID,
-				Checkpoint: 1,
+				Checkpoint: 0,
 				TotalSteps: lenSteps,
 				Status:     1,
 				IdTest:     "",
@@ -76,7 +76,7 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	qa := &db.TblQueueAutomation{
 		Testsuite:  req.TestSuiteID,
-		Checkpoint: 1,
+		Checkpoint: 0,
 		TotalSteps: lenSteps,
 		Status:     2,
 		IdTest:     runResp.RunningID,
@@ -88,5 +88,53 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 		Status:  "success",
 		Message: "Selenium test triggered",
 		Data:    runResp,
+	})
+}
+
+// UpdateStatusHandler handles POST /automation/updatestatus.
+// Expected payload: {"id_test": "test123", "checkpoint": 2, "status": 3}
+func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
+	// Define the payload structure.
+	var req struct {
+		IdTest   string `json:"id_test"`
+		StepName string `json:"step_name"`
+		Status   int    `json:"status"`
+	}
+
+	// Decode the request payload.
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "Invalid request payload",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Validate the required field.
+	if req.IdTest == "" {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "id_test is required",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Call the use case to update the status.
+	if err := h.queueAutomationUsecase.UpdateStatus(req.IdTest, req.StepName, req.Status); err != nil {
+		respondJSON(w, http.StatusInternalServerError, StandardResponse{
+			Status:  "error",
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	// Respond with success.
+	respondJSON(w, http.StatusOK, StandardResponse{
+		Status:  "success",
+		Message: "Status updated successfully",
+		Data:    nil,
 	})
 }

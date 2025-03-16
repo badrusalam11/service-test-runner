@@ -33,3 +33,37 @@ func CreateQueueAutomation(qa *TblQueueAutomation) error {
 	log.Printf("Inserted QueueAutomation record: %+v", qa)
 	return nil
 }
+
+// UpdateQueueAutomationStatus updates the checkpoint and status for a record identified by idTest.
+func UpdateQueueAutomationStatus(idTest string, stepName string, checkpoint int, status int) error {
+	result := DB.Model(&TblQueueAutomation{}).
+		Where("id_test = ?", idTest).
+		Updates(map[string]interface{}{
+			"step_name":  stepName,
+			"checkpoint": checkpoint,
+			"status":     status,
+		})
+	return result.Error
+}
+
+// SelectAllQueueAutomation retrieves all QueueAutomation records.
+func SelectAllQueueAutomation() ([]TblQueueAutomation, error) {
+	var qaList []TblQueueAutomation
+	result := DB.Find(&qaList)
+	if result.Error != nil {
+		log.Printf("Error selecting all QueueAutomation records: %v", result.Error)
+		return nil, result.Error
+	}
+	return qaList, nil
+}
+
+// SelectQueueAutomationByIdTest retrieves a single record from tbl_QueueAutomation using the Id_test field.
+func SelectQueueAutomationByIdTest(idTest string) (*TblQueueAutomation, error) {
+	var qa TblQueueAutomation
+	result := DB.Where("id_test = ?", idTest).First(&qa)
+	if result.Error != nil {
+		log.Printf("Error selecting QueueAutomation record for idTest %s: %v", idTest, result.Error)
+		return nil, result.Error
+	}
+	return &qa, nil
+}

@@ -9,6 +9,7 @@ import (
 	"service-test-runner/internal/db"
 	httpDelivery "service-test-runner/internal/delivery/http"
 	handler "service-test-runner/internal/delivery/http/handler"
+	automationRepo "service-test-runner/internal/repository/automation"
 	"service-test-runner/internal/repository/project"
 	"service-test-runner/internal/repository/selenium"
 	"service-test-runner/internal/usecase"
@@ -37,9 +38,11 @@ func main() {
 	// Initialize repository with the project mappings.
 	seleniumRepo := selenium.NewSeleniumRepository(projects)
 	projectRepo := project.NewProjectRepository(projects)
+	queueAutomationRepository := automationRepo.NewQueueAutomationRepository()
 
 	// Initialize use cases.
 	automationUsecase := usecase.NewAutomationUsecase(seleniumRepo)
+	queueAutomationUsecase := usecase.NewQueueAutomationUseCase(queueAutomationRepository)
 	testsuiteUsecase := usecase.NewTestSuiteUsecase(seleniumRepo)
 	projectUsecase := usecase.NewProjectUsecase(projectRepo)
 
@@ -47,6 +50,7 @@ func main() {
 	router := mux.NewRouter()
 	handler := handler.NewHandler(
 		automationUsecase,
+		queueAutomationUsecase,
 		testsuiteUsecase,
 		projectUsecase)
 	httpDelivery.RegisterRoutes(router, handler)
