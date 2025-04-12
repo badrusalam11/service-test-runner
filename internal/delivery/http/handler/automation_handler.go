@@ -30,6 +30,8 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// Retrieve test suite details (to count the steps).
 	detailResp, err := h.testsuiteUsecase.GetDetail(req.Project, req.TestSuiteID)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, StandardResponse{
@@ -37,32 +39,33 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 			Message: "Project or test suite not found",
 			Data:    nil,
 		})
+		return
 	}
-	// count the steps
-	featureData := detailResp.FeatureData
+
+	// Count the total steps.
 	lenSteps := 0
-	for _, feature := range featureData {
-		scenarios := feature.Scenarios
-		for _, scenario := range scenarios {
+	for _, feature := range detailResp.FeatureData {
+		for _, scenario := range feature.Scenarios {
 			lenSteps += len(scenario.Steps)
 		}
 	}
+
+	// Trigger the automation run.
 	runResp, err := h.automationUsecase.Run(req.Project, req.TestSuiteID, req.Email)
 	if err != nil {
 		if err.Error() == "your request is queued" {
-			qa := &db.TblQueueAutomation{
-				Testsuite:  req.TestSuiteID,
-				Checkpoint: 0,
-				TotalSteps: lenSteps,
-				Status:     1,
-				IdTest:     "",
-				Project:    req.Project,
-				// The CreatedAt field will be set automatically in the db.CreateQueueAutomation function.
+			// For a queued request, handle DB creation and publish a RabbitMQ message.
+			if err := h.automationUsecase.HandleQueuedRequest(req.Project, req.TestSuiteID, lenSteps); err != nil {
+				respondJSON(w, http.StatusInternalServerError, StandardResponse{
+					Status:  "error",
+					Message: err.Error(),
+					Data:    nil,
+				})
+				return
 			}
-			db.CreateQueueAutomation(qa)
 			respondJSON(w, http.StatusAccepted, StandardResponse{
 				Status:  "success",
-				Message: err.Error(),
+				Message: "Request queued. A RabbitMQ message has been published.",
 				Data:    nil,
 			})
 			return
@@ -74,14 +77,15 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	// If run was successful, create a DB record with status=2 (triggered).
 	qa := &db.TblQueueAutomation{
 		Testsuite:  req.TestSuiteID,
 		Checkpoint: 0,
 		TotalSteps: lenSteps,
-		Status:     2,
+		Status:     2, // triggered
 		IdTest:     runResp.RunningID,
 		Project:    req.Project,
-		// The CreatedAt field will be set automatically in the db.CreateQueueAutomation function.
 	}
 	db.CreateQueueAutomation(qa)
 	respondJSON(w, http.StatusOK, StandardResponse{

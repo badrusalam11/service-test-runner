@@ -5,5 +5,12 @@
     "username": "root",
     "password": "",
     "dbname": "db_omnirunner"
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "port": 5672,
+    "username": "guest",
+    "password": "guest",
+    "exchange": "automation"
   }
 }

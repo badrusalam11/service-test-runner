@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -19,11 +20,28 @@ type DatabaseConfig struct {
 
 type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
+	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
+}
+
+// RabbitMQConfig holds the RabbitMQ specific configuration.
+type RabbitMQConfig struct {
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	Username     string `mapstructure:"username"`
+	Password     string `mapstructure:"password"`
+	ExchangeName string `mapstructure:"exchange"`
+}
+
+// AMQPURL builds the AMQP URL from the individual RabbitMQ configuration fields.
+func (r *RabbitMQConfig) AMQPURL() string {
+	fmt.Println("r", r)
+	return fmt.Sprintf("amqp://%s:%s@%s:%d/", r.Username, r.Password, r.Host, r.Port)
 }
 
 func LoadConfig() (*Config, error) {
 	// Check if the .env file exists.
 	if _, err := os.Stat(".env"); err == nil {
+		fmt.Println("loading env")
 		// .env exists; load it.
 		if err := godotenv.Load(); err != nil {
 			log.Printf("Error loading .env file: %v", err)
@@ -35,7 +53,11 @@ func LoadConfig() (*Config, error) {
 		viper.BindEnv("database.username", "DATABASE_USERNAME")
 		viper.BindEnv("database.password", "DATABASE_PASSWORD")
 		viper.BindEnv("database.dbname", "DATABASE_DBNAME")
-
+		viper.BindEnv("rabbitmq.host", "RABBITMQ_HOST")
+		viper.BindEnv("rabbitmq.port", "RABBITMQ_PORT")
+		viper.BindEnv("rabbitmq.username", "RABBITMQ_USERNAME")
+		viper.BindEnv("rabbitmq.password", "RABBITMQ_PASSWORD")
+		viper.BindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE_NAME")
 		// Since environment variables are strings, we might need to convert port.
 		if portStr := os.Getenv("DATABASE_PORT"); portStr != "" {
 			if port, err := strconv.Atoi(portStr); err == nil {
@@ -58,5 +80,6 @@ func LoadConfig() (*Config, error) {
 		log.Printf("Error unmarshaling config: %v", err)
 		return nil, err
 	}
+	fmt.Println(cfg)
 	return &cfg, nil
 }

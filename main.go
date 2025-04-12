@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"service-test-runner/internal/db"
 	httpDelivery "service-test-runner/internal/delivery/http"
 	handler "service-test-runner/internal/delivery/http/handler"
+	"service-test-runner/internal/infrastructure/messaging"
 	automationRepo "service-test-runner/internal/repository/automation"
 	"service-test-runner/internal/repository/project"
 	"service-test-runner/internal/repository/selenium"
@@ -24,6 +26,14 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Connect to RabbitMQ using the dynamically built URL.
+	conn, channel, err := messaging.ConnectToRabbitMQ(cfg.RabbitMQ.AMQPURL())
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	defer conn.Close()
+	defer channel.Close()
+
 	// Initialize the database connection using GORM (see internal/db/db.go)
 	if err := db.InitDB(cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
@@ -34,14 +44,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load projects from database: %v", err)
 	}
-
+	fmt.Println("rabbit", cfg.RabbitMQ)
 	// Initialize repository with the project mappings.
 	seleniumRepo := selenium.NewSeleniumRepository(projects)
 	projectRepo := project.NewProjectRepository(projects)
 	queueAutomationRepository := automationRepo.NewQueueAutomationRepository()
-
+	messaging := messaging.NewRabbitMQPublisher(channel, cfg.RabbitMQ.ExchangeName)
 	// Initialize use cases.
-	automationUsecase := usecase.NewAutomationUsecase(seleniumRepo)
+	automationUsecase := usecase.NewAutomationUsecase(seleniumRepo, messaging)
 	queueAutomationUsecase := usecase.NewQueueAutomationUseCase(queueAutomationRepository)
 	testsuiteUsecase := usecase.NewTestSuiteUsecase(seleniumRepo)
 	projectUsecase := usecase.NewProjectUsecase(projectRepo)
