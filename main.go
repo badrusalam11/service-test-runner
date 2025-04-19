@@ -11,6 +11,7 @@ import (
 	httpDelivery "service-test-runner/internal/delivery/http"
 	handler "service-test-runner/internal/delivery/http/handler"
 	"service-test-runner/internal/infrastructure/messaging"
+	"service-test-runner/internal/infrastructure/storage"
 	automationRepo "service-test-runner/internal/repository/automation"
 	"service-test-runner/internal/repository/project"
 	"service-test-runner/internal/repository/selenium"
@@ -33,6 +34,12 @@ func main() {
 	}
 	defer conn.Close()
 	defer channel.Close()
+
+	// Initialize MinIO Service
+	minioService, err := storage.NewMinioService(&cfg.MinIO)
+	if err != nil {
+		log.Fatalf("Failed to initialize MinIO service: %v", err)
+	}
 
 	// Initialize the database connection using GORM (see internal/db/db.go)
 	if err := db.InitDB(cfg); err != nil {
@@ -62,7 +69,8 @@ func main() {
 		automationUsecase,
 		queueAutomationUsecase,
 		testsuiteUsecase,
-		projectUsecase)
+		projectUsecase,
+		minioService)
 	httpDelivery.RegisterRoutes(router, handler)
 
 	// Start the server.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"service-test-runner/internal/infrastructure/storage"
 	usecase "service-test-runner/internal/usecase"
 )
 
@@ -18,6 +19,7 @@ type Handler struct {
 	queueAutomationUsecase *usecase.QueueAutomationUseCase
 	testsuiteUsecase       *usecase.TestSuiteUsecase
 	projectUsecase         *usecase.ProjectUsecase
+	minioService           *storage.MinioService
 }
 
 func NewHandler(
@@ -25,12 +27,14 @@ func NewHandler(
 	queueAutomationUsecase *usecase.QueueAutomationUseCase,
 	testsuiteUsecase *usecase.TestSuiteUsecase,
 	projectUsecase *usecase.ProjectUsecase,
+	minioService *storage.MinioService,
 ) *Handler {
 	return &Handler{
 		automationUsecase:      automationUsecase,
 		queueAutomationUsecase: queueAutomationUsecase,
 		testsuiteUsecase:       testsuiteUsecase,
 		projectUsecase:         projectUsecase,
+		minioService:           minioService,
 	}
 }
 

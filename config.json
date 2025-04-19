@@ -12,5 +12,12 @@
     "username": "guest",
     "password": "guest",
     "exchange": "automation"
+  },
+  "minio": {
+    "endpoint": "localhost:9000",
+    "username": "minioadmin",
+    "password": "minioadmin",
+    "usessl": false,
+    "bucket": "automation-reports"
   }
 }

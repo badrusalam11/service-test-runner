@@ -2,8 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"service-test-runner/internal/db"
+	"strconv"
+	"strings"
 )
 
 // RunAutomationHandler handles POST /automation/run.
@@ -96,27 +100,28 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateStatusHandler handles POST /automation/updatestatus.
-// Expected payload: {"id_test": "test123", "checkpoint": 2, "status": 3}
+// Expected payload: multipart form with:
+// - id_test: string
+// - step_name: string
+// - status: int
+// - report_file: optional PDF file
 func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
-	// Define the payload structure.
-	var req struct {
-		IdTest   string `json:"id_test"`
-		StepName string `json:"step_name"`
-		Status   int    `json:"status"`
-	}
-
-	// Decode the request payload.
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Parse multipart form with 10MB max memory
+	if err := r.ParseMultipartForm(10 << 20); err != nil && err != http.ErrNotMultipart {
 		respondJSON(w, http.StatusBadRequest, StandardResponse{
 			Status:  "error",
-			Message: "Invalid request payload",
+			Message: "Failed to parse form data",
 			Data:    nil,
 		})
 		return
 	}
 
-	// Validate the required field.
-	if req.IdTest == "" {
+	// Get form values
+	idTest := r.FormValue("id_test")
+	stepName := r.FormValue("step_name")
+	status := r.FormValue("status")
+
+	if idTest == "" {
 		respondJSON(w, http.StatusBadRequest, StandardResponse{
 			Status:  "error",
 			Message: "id_test is required",
@@ -125,8 +130,61 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call the use case to update the status.
-	if err := h.queueAutomationUsecase.UpdateStatus(req.IdTest, req.StepName, req.Status); err != nil {
+	statusInt := 0
+	if status != "" {
+		var err error
+		statusInt, err = strconv.Atoi(status)
+		if err != nil {
+			respondJSON(w, http.StatusBadRequest, StandardResponse{
+				Status:  "error",
+				Message: "Invalid status value",
+				Data:    nil,
+			})
+			return
+		}
+	}
+
+	// Handle file upload if present
+	if file, header, err := r.FormFile("report_file"); err == nil && file != nil {
+		defer file.Close()
+
+		// Check if it's a PDF
+		if !strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
+			respondJSON(w, http.StatusBadRequest, StandardResponse{
+				Status:  "error",
+				Message: "Only PDF files are allowed",
+				Data:    nil,
+			})
+			return
+		}
+
+		// Read file content
+		fileBytes, err := io.ReadAll(file)
+		if err != nil {
+			respondJSON(w, http.StatusInternalServerError, StandardResponse{
+				Status:  "error",
+				Message: "Failed to read file",
+				Data:    nil,
+			})
+			return
+		}
+
+		// Generate a unique filename using id_test
+		objectName := fmt.Sprintf("reports/%s/report.pdf", idTest)
+
+		// Upload to MinIO
+		if err := h.minioService.UploadPDF(objectName, fileBytes); err != nil {
+			respondJSON(w, http.StatusInternalServerError, StandardResponse{
+				Status:  "error",
+				Message: "Failed to upload report file",
+				Data:    nil,
+			})
+			return
+		}
+	}
+
+	// Call the use case to update the status
+	if err := h.queueAutomationUsecase.UpdateStatus(idTest, stepName, statusInt); err != nil {
 		respondJSON(w, http.StatusInternalServerError, StandardResponse{
 			Status:  "error",
 			Message: err.Error(),
@@ -135,7 +193,7 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respond with success.
+	// Respond with success
 	respondJSON(w, http.StatusOK, StandardResponse{
 		Status:  "success",
 		Message: "Status updated successfully",
@@ -202,6 +260,7 @@ func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
 			"step_name":   automation.StepName,
 			"total_steps": automation.TotalSteps,
 			"progress":    progress,
+			"report_file": automation.ReportFile,
 		},
 	})
 }

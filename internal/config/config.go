@@ -21,6 +21,16 @@ type DatabaseConfig struct {
 type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
+	MinIO    MinIOConfig    `mapstructure:"minio"`
+}
+
+// MinIOConfig holds the MinIO specific configuration
+type MinIOConfig struct {
+	Endpoint   string `mapstructure:"endpoint"`
+	Username   string `mapstructure:"username"`
+	Password   string `mapstructure:"password"`
+	UseSSL     bool   `mapstructure:"usessl"`
+	BucketName string `mapstructure:"bucket"`
 }
 
 // RabbitMQConfig holds the RabbitMQ specific configuration.
@@ -58,7 +68,12 @@ func LoadConfig() (*Config, error) {
 		viper.BindEnv("rabbitmq.username", "RABBITMQ_USERNAME")
 		viper.BindEnv("rabbitmq.password", "RABBITMQ_PASSWORD")
 		viper.BindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE_NAME")
-		// Since environment variables are strings, we might need to convert port.
+		viper.BindEnv("minio.endpoint", "MINIO_ENDPOINT")
+		viper.BindEnv("minio.username", "MINIO_USERNAME")
+		viper.BindEnv("minio.password", "MINIO_PASSWORD")
+		viper.BindEnv("minio.usessl", "MINIO_USE_SSL")
+		viper.BindEnv("minio.bucket", "MINIO_BUCKET")
+		//Since environment variables are strings, we might need to convert port.
 		if portStr := os.Getenv("DATABASE_PORT"); portStr != "" {
 			if port, err := strconv.Atoi(portStr); err == nil {
 				viper.Set("database.port", port)

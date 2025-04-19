@@ -16,6 +16,7 @@ type TblQueueAutomation struct {
 	IdTest     string    `gorm:"null"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"` // Automatically set to current time
 	Project    string    `gorm:"not null"`
+	ReportFile string    `gorm:"null"`
 }
 
 // CreateQueueAutomation inserts a new record into tbl_QueueAutomation.
@@ -44,6 +45,14 @@ func UpdateQueueAutomationStatus(idTest string, stepName string, checkpoint int,
 			"checkpoint": checkpoint,
 			"status":     status,
 		})
+	return result.Error
+}
+
+// UpdateQueueAutomationReportFile updates the report_file URL for a record identified by idTest.
+func UpdateQueueAutomationReportFile(idTest string, reportFileURL string) error {
+	result := DB.Model(&TblQueueAutomation{}).
+		Where("id_test = ?", idTest).
+		Update("report_file", reportFileURL)
 	return result.Error
 }
 
