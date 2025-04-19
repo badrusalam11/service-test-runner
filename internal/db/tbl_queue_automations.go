@@ -9,6 +9,7 @@ import (
 type TblQueueAutomation struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement"`
 	Testsuite  string    `gorm:"unique;not null"`
+	StepName   string    `gorm:"not null"`
 	Checkpoint int       `gorm:"not null"`
 	TotalSteps int       `gorm:"not null"`
 	Status     int       `gorm:"not null"`

@@ -187,15 +187,21 @@ func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
+	progress := automation.Checkpoint * 100 / automation.TotalSteps
+	if progress > 100 {
+		progress = 100
+	}
 	// Return the automation status
 	respondJSON(w, http.StatusOK, StandardResponse{
 		Status:  "success",
 		Message: "Test Suites",
 		Data: map[string]interface{}{
-			"id_test":    automation.IdTest,
-			"checkpoint": automation.Checkpoint,
-			"status":     automation.Status,
+			"id_test":     automation.IdTest,
+			"checkpoint":  automation.Checkpoint,
+			"status":      automation.Status,
+			"step_name":   automation.StepName,
+			"total_steps": automation.TotalSteps,
+			"progress":    progress,
 		},
 	})
 }
