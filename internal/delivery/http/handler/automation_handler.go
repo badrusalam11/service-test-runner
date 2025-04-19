@@ -142,3 +142,60 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 		Data:    nil,
 	})
 }
+
+// CheckStatusHandler handles POST /automation/check-status
+// Expected payload: {"id_test": "20250315_214839"}
+func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		IdTest string `json:"id_test"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "Invalid request payload",
+			Data:    nil,
+		})
+		return
+	}
+
+	if req.IdTest == "" {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "id_test is required",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Get automation status from use case
+	automation, err := h.queueAutomationUsecase.GetByIdTest(req.IdTest)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, StandardResponse{
+			Status:  "error",
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	if automation == nil {
+		respondJSON(w, http.StatusNotFound, StandardResponse{
+			Status:  "error",
+			Message: "Automation not found",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Return the automation status
+	respondJSON(w, http.StatusOK, StandardResponse{
+		Status:  "success",
+		Message: "Test Suites",
+		Data: map[string]interface{}{
+			"id_test":    automation.IdTest,
+			"checkpoint": automation.Checkpoint,
+			"status":     automation.Status,
+		},
+	})
+}

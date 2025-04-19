@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"service-test-runner/internal/db"
 	automationRepo "service-test-runner/internal/repository/automation"
 )
 
@@ -13,6 +14,11 @@ type QueueAutomationUseCase struct {
 // NewQueueAutomationUseCase creates a new instance of QueueAutomationUseCase.
 func NewQueueAutomationUseCase(repo automationRepo.QueueAutomationRepository) *QueueAutomationUseCase {
 	return &QueueAutomationUseCase{repo: repo}
+}
+
+// GetByIdTest retrieves automation details by ID
+func (uc *QueueAutomationUseCase) GetByIdTest(idTest string) (*db.TblQueueAutomation, error) {
+	return uc.repo.GetByIdTest(idTest)
 }
 
 // UpdateStatus checks for record existence before updating status.
