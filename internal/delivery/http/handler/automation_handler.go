@@ -144,6 +144,9 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Variables to store MinIO report URL
+	var reportFileURL string
+
 	// Handle file upload if present
 	if file, header, err := r.FormFile("report_file"); err == nil && file != nil {
 		defer file.Close()
@@ -177,6 +180,19 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusInternalServerError, StandardResponse{
 				Status:  "error",
 				Message: "Failed to upload report file",
+				Data:    nil,
+			})
+			return
+		}
+
+		// Get the URL for the uploaded file
+		reportFileURL = h.minioService.GetFileURL(objectName)
+
+		// Update the report file URL in the database
+		if err := h.queueAutomationUsecase.UpdateReportFile(idTest, reportFileURL); err != nil {
+			respondJSON(w, http.StatusInternalServerError, StandardResponse{
+				Status:  "error",
+				Message: "Failed to update report file URL",
 				Data:    nil,
 			})
 			return

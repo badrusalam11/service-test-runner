@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/url"
 	"service-test-runner/internal/config"
-	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -65,15 +63,6 @@ func (s *MinioService) UploadPDF(objectName string, fileBytes []byte) error {
 }
 
 func (s *MinioService) GetFileURL(objectName string) string {
-	// Generate presigned URL that expires in 12 hours
-	presignedURL, err := s.client.PresignedGetObject(context.Background(), s.bucketName, objectName, time.Hour*12, nil)
-	if err != nil {
-		return ""
-	}
-
-	// Convert the direct presigned URL to the web console download URL format
-	// The web console runs on port 9001 by default
-	consolePort := "9001"
-	encodedURL := url.QueryEscape(presignedURL.String())
-	return fmt.Sprintf("http://localhost:%s/api/v1/download-shared-object/%s", consolePort, encodedURL)
+	// Return direct URL to the object in MinIO
+	return fmt.Sprintf("http://%s/%s/%s", s.endpoint, s.bucketName, objectName)
 }

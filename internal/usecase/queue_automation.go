@@ -39,3 +39,8 @@ func (uc *QueueAutomationUseCase) UpdateStatus(idTest string, stepName string, s
 	// If it exists, update the status.
 	return uc.repo.UpdateStatus(idTest, stepName, newCheckpoint, status)
 }
+
+// UpdateReportFile updates the report file URL for a given test ID.
+func (uc *QueueAutomationUseCase) UpdateReportFile(idTest string, reportFileURL string) error {
+	return db.UpdateQueueAutomationReportFile(idTest, reportFileURL)
+}
