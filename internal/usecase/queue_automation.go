@@ -21,10 +21,29 @@ func (uc *QueueAutomationUseCase) GetByIdTest(idTest string) (*db.TblQueueAutoma
 	return uc.repo.GetByIdTest(idTest)
 }
 
-// UpdateStatus checks for record existence before updating status.
-func (uc *QueueAutomationUseCase) UpdateStatus(idTest string, stepName string, status int) error {
+// GetByReferenceNumber retrieves automation details by reference number.
+func (uc *QueueAutomationUseCase) GetByReferenceNumber(referenceNumber string) (*db.TblQueueAutomation, error) {
+	return uc.repo.GetByReferenceNumber(referenceNumber)
+}
+
+// UpdateStatusByReferenceNumber updates the status of a record by its reference number.
+func (uc *QueueAutomationUseCase) UpdateStatusByReferenceNumber(qa *db.TblQueueAutomation) error {
 	// Check if the record exists.
-	record, err := uc.repo.GetByIdTest(idTest)
+	record, err := uc.repo.GetByReferenceNumber(qa.ReferenceNumber)
+	if err != nil {
+		return err
+	}
+	if record == nil {
+		return errors.New("record not found")
+	}
+	// If it exists, update the status.
+	return uc.repo.UpdateStatusByReferenceNumber(qa.IdTest, qa.ReferenceNumber, qa.Status)
+}
+
+// UpdateStatus checks for record existence before updating status.
+func (uc *QueueAutomationUseCase) UpdateStatus(idTest string, stepName string, status int, referenceNumber string) error {
+	// Check if the record exists.
+	record, err := uc.repo.GetByReferenceNumber(referenceNumber)
 	if err != nil {
 		return err
 	}
@@ -37,7 +56,7 @@ func (uc *QueueAutomationUseCase) UpdateStatus(idTest string, stepName string, s
 	}
 
 	// If it exists, update the status.
-	return uc.repo.UpdateStatus(idTest, stepName, newCheckpoint, status)
+	return uc.repo.UpdateStatus(idTest, stepName, newCheckpoint, status, referenceNumber)
 }
 
 // UpdateReportFile updates the report file URL for a given test ID.

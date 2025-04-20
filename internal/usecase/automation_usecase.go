@@ -6,7 +6,6 @@ import (
 	"service-test-runner/internal/domain"
 	"service-test-runner/internal/infrastructure/messaging"
 	"service-test-runner/internal/repository/selenium"
-	"time"
 )
 
 // AutomationUsecase handles automation logic.
@@ -25,8 +24,8 @@ func NewAutomationUsecase(repo *selenium.SeleniumRepository, publisher messaging
 
 // Run triggers the automation using testsuite_id and email.
 // If the request is queued, it publishes a RabbitMQ message.
-func (a *AutomationUsecase) Run(project, testsuiteID, email string) (domain.RunResponse, error) {
-	runResp, err := a.repo.RunAutomation(project, testsuiteID, email)
+func (a *AutomationUsecase) Run(project, testsuiteID, email, refnum string) (domain.RunResponse, error) {
+	runResp, err := a.repo.RunAutomation(project, testsuiteID, email, refnum)
 	if err != nil {
 		return runResp, err
 	}
@@ -34,14 +33,13 @@ func (a *AutomationUsecase) Run(project, testsuiteID, email string) (domain.RunR
 }
 
 // HandleQueuedRequest handles a queued automation request by storing a DB record and publishing a RabbitMQ message.
-func (uc *AutomationUsecase) HandleQueuedRequest(project, testsuiteID string, totalSteps int) error {
-	timestamp := time.Now().Unix()
+func (uc *AutomationUsecase) HandleQueuedRequest(project, testsuiteID string, totalSteps int, refnum string) error {
 	// Prepare the message payload.
 	msgBody := map[string]interface{}{
-		"refnum":       timestamp,
-		"project":      project,
-		"testsuite_id": testsuiteID,
-		"total_steps":  totalSteps,
+		"reference_number": refnum,
+		"project":          project,
+		"testsuite_id":     testsuiteID,
+		"total_steps":      totalSteps,
 	}
 	msgBytes, err := json.Marshal(msgBody)
 	if err != nil {

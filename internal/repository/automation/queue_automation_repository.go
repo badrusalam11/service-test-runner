@@ -7,7 +7,9 @@ import (
 // QueueAutomationRepository defines the repository interface.
 type QueueAutomationRepository interface {
 	GetByIdTest(idTest string) (*db.TblQueueAutomation, error)
-	UpdateStatus(idTest string, stepName string, checkpoint int, status int) error
+	GetByReferenceNumber(referenceNumber string) (*db.TblQueueAutomation, error)
+	UpdateStatus(idTest string, stepName string, checkpoint int, status int, referenceNumber string) error
+	UpdateStatusByReferenceNumber(referenceNumber string, stepName string, status int) error
 }
 
 // queueAutomationRepository is the concrete implementation.
@@ -24,6 +26,16 @@ func (r *queueAutomationRepository) GetByIdTest(idTest string) (*db.TblQueueAuto
 }
 
 // UpdateStatus updates the record’s checkpoint and status.
-func (r *queueAutomationRepository) UpdateStatus(idTest string, stepName string, checkpoint int, status int) error {
-	return db.UpdateQueueAutomationStatus(idTest, stepName, checkpoint, status)
+func (r *queueAutomationRepository) UpdateStatus(idTest string, stepName string, checkpoint int, status int, referenceNumber string) error {
+	return db.UpdateQueueAutomationStatus(idTest, stepName, checkpoint, status, referenceNumber)
+}
+
+// GetByReferenceNumber fetches a record by its reference number.
+func (r *queueAutomationRepository) GetByReferenceNumber(referenceNumber string) (*db.TblQueueAutomation, error) {
+	return db.SelectQueueAutomationByRefnum(referenceNumber)
+}
+
+// UpdateStatusByReferenceNumber updates the record’s status by its reference number.
+func (r *queueAutomationRepository) UpdateStatusByReferenceNumber(idTest string, referenceNumber string, status int) error {
+	return db.UpdateQueueAutomationStatusByReferenceNumber(idTest, referenceNumber, status)
 }

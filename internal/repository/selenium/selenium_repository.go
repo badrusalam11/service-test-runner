@@ -29,15 +29,16 @@ func (s *SeleniumRepository) getBaseURL(project string) (string, error) {
 }
 
 // RunAutomation calls POST /selenium/run with payload {"testsuite_id", "email"}.
-func (s *SeleniumRepository) RunAutomation(project, testsuiteID, email string) (domain.RunResponse, error) {
+func (s *SeleniumRepository) RunAutomation(project, testsuiteID, email, refnum string) (domain.RunResponse, error) {
 	baseURL, err := s.getBaseURL(project)
 	if err != nil {
 		return domain.RunResponse{}, err
 	}
 	endpoint := fmt.Sprintf("%s/selenium/run", baseURL)
 	payload := map[string]string{
-		"testsuite_id": testsuiteID,
-		"email":        email,
+		"testsuite_id":     testsuiteID,
+		"email":            email,
+		"reference_number": refnum,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

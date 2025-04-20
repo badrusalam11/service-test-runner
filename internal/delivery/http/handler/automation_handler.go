@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"service-test-runner/internal/db"
+	"service-test-runner/internal/utils"
 	"strconv"
 	"strings"
 )
@@ -55,11 +56,26 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Trigger the automation run.
-	runResp, err := h.automationUsecase.Run(req.Project, req.TestSuiteID, req.Email)
+	refnum := utils.GenerateRefNum()
+	runResp, err := h.automationUsecase.Run(req.Project, req.TestSuiteID, req.Email, refnum)
+	runResp.ReferenceNumber = refnum
+	runResp.TestSuiteID = req.TestSuiteID
 	if err != nil {
 		if err.Error() == "your request is queued" {
+			// insert into DB with status=1 (queued)
+			qa := &db.TblQueueAutomation{
+				ReferenceNumber: refnum,
+				Testsuite:       req.TestSuiteID,
+				Checkpoint:      0,
+				TotalSteps:      lenSteps,
+				Status:          1, // queued
+				StepName:        "queued",
+				IdTest:          runResp.RunningID,
+				Project:         req.Project,
+			}
+			db.CreateQueueAutomation(qa)
 			// For a queued request, handle DB creation and publish a RabbitMQ message.
-			if err := h.automationUsecase.HandleQueuedRequest(req.Project, req.TestSuiteID, lenSteps); err != nil {
+			if err := h.automationUsecase.HandleQueuedRequest(req.Project, req.TestSuiteID, lenSteps, refnum); err != nil {
 				respondJSON(w, http.StatusInternalServerError, StandardResponse{
 					Status:  "error",
 					Message: err.Error(),
@@ -70,7 +86,7 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusAccepted, StandardResponse{
 				Status:  "success",
 				Message: "Request queued. A RabbitMQ message has been published.",
-				Data:    nil,
+				Data:    runResp,
 			})
 			return
 		}
@@ -81,15 +97,15 @@ func (h *Handler) RunAutomationHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	// If run was successful, create a DB record with status=2 (triggered).
 	qa := &db.TblQueueAutomation{
-		Testsuite:  req.TestSuiteID,
-		Checkpoint: 0,
-		TotalSteps: lenSteps,
-		Status:     2, // triggered
-		IdTest:     runResp.RunningID,
-		Project:    req.Project,
+		ReferenceNumber: refnum,
+		Testsuite:       req.TestSuiteID,
+		Checkpoint:      0,
+		TotalSteps:      lenSteps,
+		Status:          2, // triggered
+		IdTest:          runResp.RunningID,
+		Project:         req.Project,
 	}
 	db.CreateQueueAutomation(qa)
 	respondJSON(w, http.StatusOK, StandardResponse{
@@ -120,6 +136,35 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 	idTest := r.FormValue("id_test")
 	stepName := r.FormValue("step_name")
 	status := r.FormValue("status")
+	referenceNumber := r.FormValue("reference_number")
+	if referenceNumber == "" {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "reference_number is required",
+			Data:    nil,
+		})
+		return
+	}
+	if referenceNumber != "" {
+		// If reference number is provided, get the corresponding id_test
+		automation, err := h.queueAutomationUsecase.GetByReferenceNumber(referenceNumber)
+		if err != nil {
+			respondJSON(w, http.StatusInternalServerError, StandardResponse{
+				Status:  "error",
+				Message: err.Error(),
+				Data:    nil,
+			})
+			return
+		}
+		if automation == nil {
+			respondJSON(w, http.StatusNotFound, StandardResponse{
+				Status:  "error",
+				Message: "Automation not found",
+				Data:    nil,
+			})
+			return
+		}
+	}
 
 	if idTest == "" {
 		respondJSON(w, http.StatusBadRequest, StandardResponse{
@@ -200,7 +245,7 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the use case to update the status
-	if err := h.queueAutomationUsecase.UpdateStatus(idTest, stepName, statusInt); err != nil {
+	if err := h.queueAutomationUsecase.UpdateStatus(idTest, stepName, statusInt, referenceNumber); err != nil {
 		respondJSON(w, http.StatusInternalServerError, StandardResponse{
 			Status:  "error",
 			Message: err.Error(),
@@ -221,7 +266,7 @@ func (h *Handler) UpdateStatusHandler(w http.ResponseWriter, r *http.Request) {
 // Expected payload: {"id_test": "20250315_214839"}
 func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IdTest string `json:"id_test"`
+		ReferenceNumber string `json:"reference_number"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -233,17 +278,17 @@ func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.IdTest == "" {
+	if req.ReferenceNumber == "" {
 		respondJSON(w, http.StatusBadRequest, StandardResponse{
 			Status:  "error",
-			Message: "id_test is required",
+			Message: "reference_number is required",
 			Data:    nil,
 		})
 		return
 	}
 
 	// Get automation status from use case
-	automation, err := h.queueAutomationUsecase.GetByIdTest(req.IdTest)
+	automation, err := h.queueAutomationUsecase.GetByReferenceNumber(req.ReferenceNumber)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, StandardResponse{
 			Status:  "error",
@@ -278,5 +323,93 @@ func (h *Handler) CheckStatusHandler(w http.ResponseWriter, r *http.Request) {
 			"progress":    progress,
 			"report_file": automation.ReportFile,
 		},
+	})
+}
+
+// retryAutomationHandler handles POST /automation/retry
+func (h *Handler) RetryAutomationHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ReferenceNumber string `json:"reference_number"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "Invalid request payload",
+			Data:    nil,
+		})
+		return
+	}
+
+	if req.ReferenceNumber == "" {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "reference_number is required",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Get previous automation data
+	prevAutomation, err := h.queueAutomationUsecase.GetByReferenceNumber(req.ReferenceNumber)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "Invalid reference number",
+			Data:    nil,
+		})
+		return
+	}
+
+	// Trigger the automation run
+	runResp, err := h.automationUsecase.Run(prevAutomation.Project, prevAutomation.Testsuite, "", req.ReferenceNumber)
+	runResp.ReferenceNumber = req.ReferenceNumber
+	runResp.TestSuiteID = prevAutomation.Testsuite
+
+	if err != nil {
+		if err.Error() == "your request is queued" {
+
+			if err := h.automationUsecase.HandleQueuedRequest(prevAutomation.Project, prevAutomation.Testsuite, prevAutomation.TotalSteps, runResp.ReferenceNumber); err != nil {
+				respondJSON(w, http.StatusInternalServerError, StandardResponse{
+					Status:  "error",
+					Message: err.Error(),
+					Data:    nil,
+				})
+				return
+			}
+			respondJSON(w, http.StatusAccepted, StandardResponse{
+				Status:  "success",
+				Message: "Request queued. A RabbitMQ message has been published.",
+				Data:    runResp,
+			})
+			return
+		}
+		respondJSON(w, http.StatusInternalServerError, StandardResponse{
+			Status:  "error",
+			Message: err.Error(),
+			Data:    nil,
+		})
+		return
+	}
+
+	// If run was successful, update the existing record with status=2 (triggered)
+	qa := &db.TblQueueAutomation{
+		ReferenceNumber: req.ReferenceNumber,
+		Status:          2, // triggered
+		IdTest:          runResp.RunningID,
+	}
+	if err := h.queueAutomationUsecase.UpdateStatusByReferenceNumber(qa); err != nil {
+		respondJSON(w, http.StatusInternalServerError, StandardResponse{
+			Status:  "error",
+			Message: "Failed to update automation status",
+			Data:    nil,
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, StandardResponse{
+		Status:  "success",
+		Message: "Selenium test triggered",
+		Data:    runResp,
 	})
 }
